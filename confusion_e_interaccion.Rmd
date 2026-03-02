@@ -1,0 +1,86 @@
+---
+title: "confusión vs interacción"
+author: "Jesús F García Gavilán"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Requisitos: ggplot2, dplyr, gridExtra
+
+```{r, warning=F, message=F}
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+```
+
+Fijar semilla para reproducibilidad
+
+```{r}
+set.seed(123)
+n <- 400
+```
+
+## 1. VARIABLE DE CONFUSIÓN
+
+```{r, warning=F}
+# Z (Confusor): 0 = No fumador, 1 = Fumador
+z_conf <- rbinom(n, 1, 0.5)
+
+# X (Exposición --> Café): Correlacionada con el confusor Z
+x_cafe <- 10 + 5 * z_conf + rnorm(n, 0, 2)
+
+# Y (Evento --> Riesgo CV): Causado por Z, relación inversa leve con X
+y_riesgo <- 20 + 10 * z_conf - 0.5 * x_cafe + rnorm(n, 0, 3)
+
+df_conf <- data.frame(Cafe = x_cafe, 
+                      Riesgo = y_riesgo, 
+                      Fumador = as.factor(ifelse(z_conf == 1, "Sí", "No")))
+
+p1 <- ggplot(df_conf, aes(x = Cafe, y = Riesgo)) +
+  geom_point(aes(color = Fumador), alpha = 0.6) +
+  # Relación espuria aparente sin ajustar (Línea general)
+  geom_smooth(method = "lm", color = "black", se = FALSE, linetype = "dashed", size = 1) + 
+  # Relación real ajustada por estratos
+  geom_smooth(aes(color = Fumador), method = "lm", se = FALSE, size = 1) + 
+  scale_color_manual(values = c("#1b9e77", "#d95f02")) +
+  theme_minimal(base_size = 12) +
+  labs(title = "Confusión:",
+       subtitle = "La línea punteada asume riesgo positivo al no ajustar por tabaco",
+       x = "Consumo de Café (Exposición)", 
+       y = "Riesgo Cardiovascular (evento)") +
+  theme(legend.position = "bottom")
+```
+
+## 2. VARIABLE DE INTERACCIÓN
+
+```{r}
+# W (Modificador): 0 = Hombres, 1 = Mujeres
+w_int <- rbinom(n, 1, 0.5)
+
+# X (Exposición --> Dosis de fármaco)
+x_dosis <- runif(n, 5, 20)
+
+# Y (Evento --> Reducción Presión Arterial): El efecto de X depende de W
+y_pa <- 10 + 2.5 * x_dosis * w_int + 0.2 * x_dosis * (1 - w_int) + rnorm(n, 0, 2)
+
+df_int <- data.frame(Dosis = x_dosis, 
+                     ReduccionPA = y_pa, 
+                     Sexo = as.factor(ifelse(w_int == 1, "Mujer", "Hombre")))
+
+p2 <- ggplot(df_int, aes(x = Dosis, y = ReduccionPA, color = Sexo)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  scale_color_manual(values = c("#7570b3", "#e7298a")) +
+  theme_minimal(base_size = 12) +
+  labs(title = "Interacción:",
+       subtitle = "Cambios en la pendiente según el sexo",
+       x = "Dosis del Fármaco (Exposición)", 
+       y = "Reducción Presión Arterial (evento)") +
+  theme(legend.position = "bottom")
+```
+
+```{r, message=F}
+grid.arrange(p1, p2, ncol = 2)
+```
+
